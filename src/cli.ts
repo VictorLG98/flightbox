@@ -4,6 +4,7 @@ import { openStore } from './store.js';
 import { runIngest } from './ingest/ingest.js';
 import { cmdList } from './commands/list.js';
 import { cmdShow } from './commands/show.js';
+import { cmdStats } from './commands/stats.js';
 import { dbPath, flightboxHome } from './paths.js';
 import { VERSION } from './version.js';
 import fs from 'node:fs';
@@ -46,6 +47,9 @@ export async function main(argv: string[]): Promise<number> {
       }
       return withStore((s) => cmdShow(s, idPrefix));
     }
+    case 'stats':
+      withStore((s) => cmdStats(s));
+      return 0;
     case '--version':
     case '-v':
       console.log(VERSION);
