@@ -54,7 +54,12 @@ export async function main(argv: string[]): Promise<number> {
 
 const isDirectRun = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
 if (isDirectRun) {
-  main(process.argv.slice(2)).then((code) => {
-    process.exitCode = code;
-  });
+  main(process.argv.slice(2))
+    .then((code) => {
+      process.exitCode = code;
+    })
+    .catch((err) => {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = 1;
+    });
 }
