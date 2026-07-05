@@ -18,10 +18,11 @@ export async function collect(stdin: NodeJS.ReadableStream): Promise<void> {
       payload = { unparsed: text.slice(0, MAX_RAW_BYTES) };
     }
 
-    const line = JSON.stringify({ received_at: new Date().toISOString(), payload }) + '\n';
+    const isoNow = new Date().toISOString();
+    const line = JSON.stringify({ received_at: isoNow, payload }) + '\n';
     const dir = rawLogDir();
     fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, `hooks-${new Date().toISOString().slice(0, 10)}.jsonl`);
+    const file = path.join(dir, `hooks-${isoNow.slice(0, 10)}.jsonl`);
     fs.appendFileSync(file, line);
   } catch {
     // Contract: the collector runs inside the user's agent session.
