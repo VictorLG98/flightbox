@@ -106,6 +106,26 @@ export function openStore(file: string = dbPath()): Store {
       (@messageUuid, @sessionId, @model, @ts, @inputTokens, @outputTokens, @cacheReadTokens, @cacheCreationTokens)
   `);
 
+  const listSql = db.prepare(`${LIST_SQL} ORDER BY s.started_at DESC`);
+  const findSessionSql = db.prepare(`${LIST_SQL} WHERE s.id GLOB ? || '*' LIMIT 1`);
+  const eventsForSessionSql = db.prepare('SELECT * FROM events WHERE session_id = ? ORDER BY ts, id');
+  const hookEventCountSql = db.prepare("SELECT COUNT(*) AS n FROM events WHERE session_id = ? AND source = 'hook'");
+  const fileTouchCountSql = db.prepare('SELECT COUNT(DISTINCT path) AS n FROM file_touches WHERE session_id = ?');
+  const sessionTokensSql = db.prepare(`
+    SELECT COALESCE(SUM(input_tokens),0) AS input, COALESCE(SUM(output_tokens),0) AS output,
+           COALESCE(SUM(cache_read_tokens),0) AS cacheRead, COALESCE(SUM(cache_creation_tokens),0) AS cacheCreation
+    FROM token_usage WHERE session_id = ?
+  `);
+  const statsByDaySql = db.prepare(`
+    SELECT substr(ts, 1, 10) AS day, SUM(input_tokens + output_tokens) AS tokens
+    FROM token_usage GROUP BY day ORDER BY day DESC LIMIT 14
+  `);
+  const statsByProjectSql = db.prepare(`
+    SELECT COALESCE(s.project_dir, '(unknown)') AS project, SUM(t.input_tokens + t.output_tokens) AS tokens
+    FROM token_usage t LEFT JOIN sessions s ON s.id = t.session_id
+    GROUP BY project ORDER BY tokens DESC
+  `);
+
   const rowToEvent = (r: any): AtfEvent => ({
     sessionId: r.session_id,
     ts: r.ts,
@@ -130,34 +150,23 @@ export function openStore(file: string = dbPath()): Store {
     insertFileTouch: (t) => insTouch.run(t),
     insertTokenUsage: (u) => insUsage.run(u),
     listSessions: () =>
-      db.prepare(`${LIST_SQL} ORDER BY s.started_at DESC`).all() as SessionSummary[],
+      listSql.all() as SessionSummary[],
     findSession: (idPrefix) =>
-      db.prepare(`${LIST_SQL} WHERE s.id LIKE ? || '%' LIMIT 1`).get(idPrefix) as SessionSummary | undefined,
+      findSessionSql.get(idPrefix) as SessionSummary | undefined,
     eventsForSession: (sessionId) =>
-      (db.prepare('SELECT * FROM events WHERE session_id = ? ORDER BY ts, id').all(sessionId) as any[]).map(rowToEvent),
+      (eventsForSessionSql.all(sessionId) as any[]).map(rowToEvent),
     hookEventCount: (sessionId) =>
-      (db.prepare("SELECT COUNT(*) AS n FROM events WHERE session_id = ? AND source = 'hook'").get(sessionId) as any).n,
+      (hookEventCountSql.get(sessionId) as any).n,
     fileTouchCount: (sessionId) =>
-      (db.prepare('SELECT COUNT(DISTINCT path) AS n FROM file_touches WHERE session_id = ?').get(sessionId) as any).n,
+      (fileTouchCountSql.get(sessionId) as any).n,
     sessionTokens: (sessionId) => {
-      const r = db.prepare(`
-        SELECT COALESCE(SUM(input_tokens),0) AS input, COALESCE(SUM(output_tokens),0) AS output,
-               COALESCE(SUM(cache_read_tokens),0) AS cacheRead, COALESCE(SUM(cache_creation_tokens),0) AS cacheCreation
-        FROM token_usage WHERE session_id = ?
-      `).get(sessionId) as any;
+      const r = sessionTokensSql.get(sessionId) as any;
       return { input: r.input, output: r.output, cacheRead: r.cacheRead, cacheCreation: r.cacheCreation };
     },
     statsByDay: () =>
-      db.prepare(`
-        SELECT substr(ts, 1, 10) AS day, SUM(input_tokens + output_tokens) AS tokens
-        FROM token_usage GROUP BY day ORDER BY day DESC LIMIT 14
-      `).all() as Array<{ day: string; tokens: number }>,
+      statsByDaySql.all() as Array<{ day: string; tokens: number }>,
     statsByProject: () =>
-      db.prepare(`
-        SELECT COALESCE(s.project_dir, '(unknown)') AS project, SUM(t.input_tokens + t.output_tokens) AS tokens
-        FROM token_usage t LEFT JOIN sessions s ON s.id = t.session_id
-        GROUP BY project ORDER BY tokens DESC
-      `).all() as Array<{ project: string; tokens: number }>,
+      statsByProjectSql.all() as Array<{ project: string; tokens: number }>,
     close: () => db.close(),
   };
 }
