@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { dbPath } from './paths.js';
-import type { AtfEvent, FileTouchInput, SessionPatch, TokenUsageInput } from './atf.js';
+import type { AtfEvent, FileTouchInput, SessionPatch, TokenUsageInput, ToolOutcomeInput } from './atf.js';
 
 export interface SessionSummary {
   id: string;
@@ -12,11 +12,17 @@ export interface SessionSummary {
   total_tokens: number;
 }
 
+export interface ClaimRow {
+  path: string;
+  status: 'succeeded' | 'failed' | 'attempted';
+}
+
 export interface Store {
   upsertSession(p: SessionPatch): void;
   insertEvent(e: AtfEvent): void;
   insertFileTouch(t: FileTouchInput): void;
   insertTokenUsage(u: TokenUsageInput): void;
+  insertToolOutcome(o: ToolOutcomeInput): void;
   listSessions(): SessionSummary[];
   findSession(idPrefix: string): SessionSummary | undefined;
   eventsForSession(sessionId: string): AtfEvent[];
@@ -27,6 +33,7 @@ export interface Store {
   };
   statsByDay(): Array<{ day: string; tokens: number }>;
   statsByProject(): Array<{ project: string; tokens: number }>;
+  claimsForSession(sessionId: string): ClaimRow[];
   close(): void;
 }
 
@@ -68,6 +75,17 @@ CREATE TABLE IF NOT EXISTS token_usage (
   cache_read_tokens INTEGER NOT NULL DEFAULT 0,
   cache_creation_tokens INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS tool_outcomes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  session_id TEXT NOT NULL,
+  path TEXT,
+  tool_name TEXT NOT NULL,
+  success INTEGER,
+  raw_response TEXT NOT NULL,
+  ts TEXT NOT NULL,
+  uniq_key TEXT NOT NULL UNIQUE
+);
+CREATE INDEX IF NOT EXISTS idx_outcomes_session_path ON tool_outcomes(session_id, path);
 `;
 
 const LIST_SQL = `
@@ -104,6 +122,21 @@ export function openStore(file: string = dbPath()): Store {
       (message_uuid, session_id, model, ts, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens)
     VALUES
       (@messageUuid, @sessionId, @model, @ts, @inputTokens, @outputTokens, @cacheReadTokens, @cacheCreationTokens)
+  `);
+  const insOutcome = db.prepare(`
+    INSERT OR IGNORE INTO tool_outcomes (session_id, path, tool_name, success, raw_response, ts, uniq_key)
+    VALUES (@sessionId, @path, @toolName, @success, @rawResponse, @ts, @uniqKey)
+  `);
+  const claimsSql = db.prepare(`
+    SELECT ft.path AS path,
+      MAX(CASE WHEN o.success = 1 THEN 1 ELSE 0 END) AS any_success,
+      MAX(CASE WHEN o.success = 0 THEN 1 ELSE 0 END) AS any_failure
+    FROM file_touches ft
+    LEFT JOIN tool_outcomes o
+      ON o.session_id = ft.session_id AND o.path = ft.path
+    WHERE ft.session_id = ? AND ft.action IN ('edit', 'write')
+    GROUP BY ft.path
+    ORDER BY ft.path
   `);
 
   const listSql = db.prepare(`${LIST_SQL} ORDER BY s.started_at DESC`);
@@ -167,6 +200,13 @@ export function openStore(file: string = dbPath()): Store {
       statsByDaySql.all() as Array<{ day: string; tokens: number }>,
     statsByProject: () =>
       statsByProjectSql.all() as Array<{ project: string; tokens: number }>,
+    insertToolOutcome: (o) =>
+      insOutcome.run({ ...o, success: o.success === null ? null : o.success ? 1 : 0 }),
+    claimsForSession: (sessionId) =>
+      (claimsSql.all(sessionId) as Array<{ path: string; any_success: number; any_failure: number }>).map((r) => ({
+        path: r.path,
+        status: r.any_success ? 'succeeded' : r.any_failure ? 'failed' : 'attempted',
+      })),
     close: () => db.close(),
   };
 }

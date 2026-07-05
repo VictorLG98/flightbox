@@ -46,6 +46,16 @@ export interface TokenUsageInput {
   cacheCreationTokens: number;
 }
 
+export interface ToolOutcomeInput {
+  sessionId: string;
+  path: string | null;
+  toolName: string;
+  success: boolean | null;
+  rawResponse: string;
+  ts: string;
+  uniqKey: string;
+}
+
 export function makeUniqKey(...parts: string[]): string {
   return createHash('sha1').update(parts.join('|')).digest('hex');
 }
