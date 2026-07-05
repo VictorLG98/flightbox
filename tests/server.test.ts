@@ -62,6 +62,18 @@ describe('http server', () => {
     expect(res.status).toBe(404);
   });
 
+  it('malformed percent-encoding in session id is 404', async () => {
+    const res = await fetch(`${base}/api/sessions/%zz`);
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBeTruthy();
+  });
+
+  it('GLOB wildcard (*) in session id is 404', async () => {
+    const res = await fetch(`${base}/api/sessions/*`);
+    expect(res.status).toBe(404);
+    expect((await res.json()).error).toBeTruthy();
+  });
+
   it('non-GET is 405', async () => {
     const res = await fetch(`${base}/api/sessions`, { method: 'POST' });
     expect(res.status).toBe(405);

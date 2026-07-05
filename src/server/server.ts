@@ -8,6 +8,21 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(json);
 }
 
+/** Decode a raw path segment into a session id, or null if invalid.
+ *  Invalid means: URIError on decode, empty string, or contains a GLOB
+ *  metacharacter (* ? [) that would widen the store's prefix query.
+ */
+function decodeId(raw: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    return null;
+  }
+  if (decoded === '' || /[*?[]/.test(decoded)) return null;
+  return decoded;
+}
+
 export function createServer(store: Store): Server {
   return http.createServer((req: IncomingMessage, res: ServerResponse) => {
     if (req.method !== 'GET') {
@@ -22,11 +37,10 @@ export function createServer(store: Store): Server {
         sendJson(res, 200, sessionListDto(store));
         return;
       }
-      let id: string;
-      try {
-        id = decodeURIComponent(parts[2]);
-      } catch {
-        id = '';
+      const id = decodeId(parts[2]);
+      if (id === null) {
+        sendJson(res, 404, { error: 'session not found' });
+        return;
       }
       if (parts.length === 3) {
         const detail = sessionDetailDto(store, id);
