@@ -65,6 +65,6 @@ export function claimsDto(store: Store, id: string): ClaimsDto | null {
   return {
     sessionId: s.id,
     hooksPresent: store.hookEventCount(s.id) > 0,
-    files: store.claimsForSession(s.id),
+    files: store.claimsForSession(s.id).map(({ path, status }) => ({ path, status })),
   };
 }
