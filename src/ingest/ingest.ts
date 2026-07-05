@@ -29,6 +29,7 @@ function ingestHooks(store: Store): void {
       if (norm.session) store.upsertSession(norm.session);
       for (const e of norm.events) store.insertEvent(e);
       for (const t of norm.touches) store.insertFileTouch(t);
+      if (norm.outcome) store.insertToolOutcome(norm.outcome);
     }
   }
 }
