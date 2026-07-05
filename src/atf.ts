@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 export type AtfEventType =
   | 'session_start'
   | 'session_end'
@@ -43,8 +45,6 @@ export interface TokenUsageInput {
   cacheReadTokens: number;
   cacheCreationTokens: number;
 }
-
-import { createHash } from 'node:crypto';
 
 export function makeUniqKey(...parts: string[]): string {
   return createHash('sha1').update(parts.join('|')).digest('hex');
