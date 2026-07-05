@@ -3,6 +3,7 @@ import { collect } from './collector.js';
 import { openStore } from './store.js';
 import { runIngest } from './ingest/ingest.js';
 import { cmdList } from './commands/list.js';
+import { cmdShow } from './commands/show.js';
 import { dbPath, flightboxHome } from './paths.js';
 import { VERSION } from './version.js';
 import fs from 'node:fs';
@@ -37,6 +38,14 @@ export async function main(argv: string[]): Promise<number> {
     case 'list':
       withStore((s) => cmdList(s));
       return 0;
+    case 'show': {
+      const idPrefix = argv[1];
+      if (!idPrefix) {
+        console.error('Usage: flightbox show <session-id-prefix>');
+        return 1;
+      }
+      return withStore((s) => cmdShow(s, idPrefix));
+    }
     case '--version':
     case '-v':
       console.log(VERSION);
