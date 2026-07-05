@@ -36,10 +36,11 @@ function ingestHooks(store: Store): void {
 function ingestTranscripts(store: Store): void {
   const projectDirs = (() => {
     try {
+      const root = claudeProjectsDir();
       return fs
-        .readdirSync(claudeProjectsDir(), { withFileTypes: true })
+        .readdirSync(root, { withFileTypes: true })
         .filter((d) => d.isDirectory())
-        .map((d) => path.join(claudeProjectsDir(), d.name));
+        .map((d) => path.join(root, d.name));
     } catch {
       return [];
     }
@@ -57,8 +58,10 @@ function ingestTranscripts(store: Store): void {
         if (n.usage) store.insertTokenUsage(n.usage);
       }
 
-      // Hook events are the primary source; transcripts only backfill
-      // sessions recorded before flightbox was installed.
+      // Hook events are the primary source; transcripts only backfill sessions
+      // recorded before flightbox was installed. Claude Code writes one session
+      // per transcript file, so gating on the first found is safe. Events without
+      // a session are dropped (unattributable without a session).
       const sessionId = norms.find((n) => n.session)?.session?.id;
       if (sessionId && store.hookEventCount(sessionId) === 0) {
         for (const n of norms) for (const e of n.events) store.insertEvent(e);
