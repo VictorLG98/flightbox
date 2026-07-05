@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { openStore, type Store } from '../src/store.js';
 import { startServer } from '../src/server/server.js';
 
@@ -63,5 +65,30 @@ describe('http server', () => {
   it('non-GET is 405', async () => {
     const res = await fetch(`${base}/api/sessions`, { method: 'POST' });
     expect(res.status).toBe(405);
+  });
+
+  it('retries next port on EADDRINUSE', async () => {
+    // Occupy a free port with a throwaway net.Server
+    const blocker = await new Promise<net.Server>((res, rej) => {
+      const s = net.createServer();
+      s.listen(0, '127.0.0.1', () => res(s));
+      s.on('error', rej);
+    });
+    const blockedPort = (blocker.address() as AddressInfo).port;
+
+    const tmp2 = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-retry-'));
+    const store2 = openStore(path.join(tmp2, 'db.sqlite'));
+    let retryServer: Server | undefined;
+    try {
+      const result = await startServer(store2, blockedPort);
+      retryServer = result.server;
+      expect(result.port).toBeGreaterThan(blockedPort);
+      expect(result.port).toBeLessThan(blockedPort + 50);
+    } finally {
+      await new Promise<void>((res) => blocker.close(() => res()));
+      retryServer?.close();
+      store2.close();
+      fs.rmSync(tmp2, { recursive: true, force: true });
+    }
   });
 });

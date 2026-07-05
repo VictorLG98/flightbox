@@ -22,7 +22,12 @@ export function createServer(store: Store): Server {
         sendJson(res, 200, sessionListDto(store));
         return;
       }
-      const id = decodeURIComponent(parts[2]);
+      let id: string;
+      try {
+        id = decodeURIComponent(parts[2]);
+      } catch {
+        id = '';
+      }
       if (parts.length === 3) {
         const detail = sessionDetailDto(store, id);
         detail ? sendJson(res, 200, detail) : sendJson(res, 404, { error: 'session not found' });
@@ -56,7 +61,7 @@ export function startServer(
     server.on('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE' && port !== 0 && port < portStart + 50) {
         port += 1;
-        tryListen();
+        server.close(() => tryListen());
       } else {
         reject(err);
       }
