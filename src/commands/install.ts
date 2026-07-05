@@ -25,9 +25,16 @@ export function cmdInstall(): number {
     const file = claudeSettingsPath();
     let settings: Record<string, unknown> = {};
     try {
-      settings = JSON.parse(fs.readFileSync(file, 'utf8'));
-    } catch {
-      // missing or unparseable settings file: start from empty
+      const raw = fs.readFileSync(file, 'utf8');
+      try {
+        settings = JSON.parse(raw);
+      } catch {
+        console.error(`install aborted: ${file} exists but is not valid JSON — fix or remove it first`);
+        return 1;
+      }
+    } catch (e: unknown) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+      // file missing: proceed with empty settings
     }
     const updated = buildHookConfig(settings);
     fs.mkdirSync(path.dirname(file), { recursive: true });

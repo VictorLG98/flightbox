@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 import { collect } from './collector.js';
-import { openStore } from './store.js';
-import { runIngest } from './ingest/ingest.js';
 import { cmdList } from './commands/list.js';
 import { cmdShow } from './commands/show.js';
 import { cmdStats } from './commands/stats.js';
@@ -20,7 +18,11 @@ Usage:
   flightbox collect     (internal) hook entry point, reads stdin
 `;
 
-function withStore<T>(fn: (store: ReturnType<typeof openStore>) => T): T {
+async function withStore<T>(fn: (store: import('./store.js').Store) => T): Promise<T> {
+  const [{ openStore }, { runIngest }] = await Promise.all([
+    import('./store.js'),
+    import('./ingest/ingest.js'),
+  ]);
   fs.mkdirSync(flightboxHome(), { recursive: true });
   const store = openStore(dbPath());
   try {
@@ -40,7 +42,7 @@ export async function main(argv: string[]): Promise<number> {
     case 'install':
       return cmdInstall();
     case 'list':
-      withStore((s) => cmdList(s));
+      await withStore((s) => cmdList(s));
       return 0;
     case 'show': {
       const idPrefix = argv[1];
@@ -48,10 +50,10 @@ export async function main(argv: string[]): Promise<number> {
         console.error('Usage: flightbox show <session-id-prefix>');
         return 1;
       }
-      return withStore((s) => cmdShow(s, idPrefix));
+      return await withStore((s) => cmdShow(s, idPrefix));
     }
     case 'stats':
-      withStore((s) => cmdStats(s));
+      await withStore((s) => cmdStats(s));
       return 0;
     case '--version':
     case '-v':
@@ -75,7 +77,8 @@ if (isDirectRun) {
       process.exitCode = code;
     })
     .catch((err) => {
-      console.error(err instanceof Error ? err.message : String(err));
-      process.exitCode = 1;
+      const isCollect = process.argv[2] === 'collect';
+      if (!isCollect) console.error(err instanceof Error ? err.message : String(err));
+      process.exitCode = isCollect ? 0 : 1;
     });
 }

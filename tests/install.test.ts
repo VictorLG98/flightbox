@@ -46,4 +46,19 @@ describe('cmdInstall', () => {
     expect(JSON.stringify(written.hooks.Stop)).toContain('flightbox collect');
     log.mockRestore();
   });
+
+  it('aborts with return 1 and leaves file unchanged when settings.json is corrupt JSON', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-'));
+    process.env.FLIGHTBOX_HOME = path.join(tmp, 'fbx');
+    process.env.FLIGHTBOX_CLAUDE_HOME = path.join(tmp, 'claude');
+    // Pre-create the settings dir and write garbage JSON
+    const settingsFile = claudeSettingsPath();
+    fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
+    fs.writeFileSync(settingsFile, '{oops');
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect(cmdInstall()).toBe(1);
+    // File must remain unchanged
+    expect(fs.readFileSync(settingsFile, 'utf8')).toBe('{oops');
+    errSpy.mockRestore();
+  });
 });

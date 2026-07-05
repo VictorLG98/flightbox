@@ -15,6 +15,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "prepack": "tsc",
     "test": "vitest run",
     "dev": "vitest"
   },

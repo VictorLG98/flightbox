@@ -19,7 +19,7 @@ flightbox list      # your past sessions are already there
 | Command | What it does |
 |---|---|
 | `flightbox install` | Register collection hooks (Claude Code) |
-| `flightbox list` | Recent sessions: project, duration, events, tokens |
+| `flightbox list` | Recent sessions: project, started, events, tokens |
 | `flightbox show <id>` | Timeline of one session |
 | `flightbox stats` | Token usage by day and by project |
 
