@@ -5,6 +5,7 @@ import { runIngest } from './ingest/ingest.js';
 import { cmdList } from './commands/list.js';
 import { cmdShow } from './commands/show.js';
 import { cmdStats } from './commands/stats.js';
+import { cmdInstall } from './commands/install.js';
 import { dbPath, flightboxHome } from './paths.js';
 import { VERSION } from './version.js';
 import fs from 'node:fs';
@@ -36,6 +37,8 @@ export async function main(argv: string[]): Promise<number> {
     case 'collect':
       await collect(process.stdin);
       return 0; // contract: never non-zero
+    case 'install':
+      return cmdInstall();
     case 'list':
       withStore((s) => cmdList(s));
       return 0;
