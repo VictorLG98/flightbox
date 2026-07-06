@@ -11,29 +11,39 @@ export function SessionList() {
     fetchSessions().then(setSessions).catch((e) => setError(String(e)));
   }, []);
 
-  if (error) return <p role="alert">Failed to load sessions: {error}</p>;
-  if (sessions === null) return <p>Loading…</p>;
-  if (sessions.length === 0) return <p>No sessions recorded yet.</p>;
+  if (error) return <p className="state error" role="alert">Failed to load sessions: {error}</p>;
+  if (sessions === null) return <p className="state">Loading…</p>;
+  if (sessions.length === 0) return <p className="state">No sessions recorded yet.</p>;
 
   const shortId = (id: string) => id.slice(0, 8);
   return (
-    <table>
-      <thead>
-        <tr><th>Session</th><th>Project</th><th>Started</th><th>Duration</th><th>Tokens</th><th>Files</th><th></th></tr>
-      </thead>
-      <tbody>
-        {sessions.map((s) => (
-          <tr key={s.id}>
-            <td><a href={`#/session/${encodeURIComponent(s.id)}`}>{shortId(s.id)}</a></td>
-            <td>{s.project ?? '—'}</td>
-            <td>{s.startedAt ? new Date(s.startedAt).toLocaleString() : '—'}</td>
-            <td>{formatDuration(s.durationMs)}</td>
-            <td>{formatTokens(s.tokens)}</td>
-            <td>{s.fileCount}</td>
-            <td>{s.hasDiscrepancy && <span data-testid="discrepancy-badge" title="Claims-vs-reality discrepancy">⚠</span>}</td>
+    <>
+      <p className="section-label">Recorded sessions · {sessions.length}</p>
+      <table className="flightlog">
+        <thead>
+          <tr>
+            <th>Session</th><th>Project</th><th>Started</th>
+            <th>Duration</th><th>Tokens</th><th>Files</th><th></th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {sessions.map((s, i) => (
+            <tr key={s.id} style={{ ['--i' as string]: i }}>
+              <td className="id"><a href={`#/session/${encodeURIComponent(s.id)}`}>{shortId(s.id)}</a></td>
+              <td className="project">{s.project ?? '—'}</td>
+              <td className="dim">{s.startedAt ? new Date(s.startedAt).toLocaleString() : '—'}</td>
+              <td className="dim">{formatDuration(s.durationMs)}</td>
+              <td className="num">{formatTokens(s.tokens)}</td>
+              <td className="num">{s.fileCount}</td>
+              <td className="badge">
+                {s.hasDiscrepancy && (
+                  <span className="warn-led" data-testid="discrepancy-badge" title="Claims-vs-reality discrepancy">⚠</span>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
   );
 }

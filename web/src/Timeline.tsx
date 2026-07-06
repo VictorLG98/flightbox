@@ -16,29 +16,41 @@ export function Timeline({ events }: { events: EventDto[] }) {
   }, [events, type, query]);
 
   return (
-    <section>
-      <div>
+    <section className="panel">
+      <p className="section-label">Timeline · {visible.length}/{events.length}</p>
+      <div className="controls">
         <label>
-          Filter type
+          <span>Filter type</span>
           <select value={type} onChange={(e) => setType(e.target.value)}>
             {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </label>
         <label>
-          Search
+          <span>Search</span>
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="text or path" />
         </label>
       </div>
-      <ol>
-        {visible.map((e, i) => (
-          <li key={i} data-testid={e.sidechain ? `sidechain-${e.detail}` : undefined} style={{ marginLeft: e.sidechain ? 24 : 0 }}>
-            <time>{new Date(e.ts).toLocaleTimeString()}</time>
-            <span> {e.type} </span>
-            {e.toolName && <code>{e.toolName}</code>}
-            <span> {e.detail}</span>
-          </li>
-        ))}
-      </ol>
+      {visible.length === 0 ? (
+        <p className="feed-empty">No events match.</p>
+      ) : (
+        <ol className="feed">
+          {visible.map((e, i) => (
+            <li
+              key={i}
+              className={`event ${e.sidechain ? 'sidechain' : ''}`}
+              data-testid={e.sidechain ? `sidechain-${e.detail}` : undefined}
+              style={{ ['--i' as string]: i }}
+            >
+              <time>{new Date(e.ts).toLocaleTimeString()}</time>
+              <span className="body">
+                <span className={`chip ${e.type}`}>{e.type}</span>
+                {e.toolName && <code className="tool">{e.toolName}</code>}
+                <span className="detail">{e.detail}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }
