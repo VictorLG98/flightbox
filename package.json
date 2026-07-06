@@ -14,8 +14,10 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc",
-    "prepack": "tsc",
+    "build": "tsc && vite build web",
+    "build:web": "vite build web",
+    "typecheck:web": "tsc -p web/tsconfig.json",
+    "prepack": "tsc && vite build web",
     "test": "vitest run",
     "dev": "vitest"
   },
@@ -23,9 +25,18 @@
     "better-sqlite3": "^12.11.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^26.1.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^25.0.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "typescript": "^6.0.3",
+    "vite": "^6.4.3",
     "vitest": "^4.1.9"
   }
 }
