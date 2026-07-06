@@ -7,5 +7,6 @@ export default defineConfig({
     environment: 'node', // web tests opt into jsdom via `// @vitest-environment jsdom`
     // MUST include the existing tests/ dir (72 tests live there) plus the new web tests.
     include: ['tests/**/*.test.ts', 'web/src/**/*.test.{ts,tsx}'],
+    setupFiles: ['web/src/test-setup.ts'],
   },
 });
