@@ -18,7 +18,7 @@ beforeEach(async () => {
   store = openStore(path.join(tmp, 'db.sqlite'));
   store.upsertSession({ id: 'abc123', projectDir: '/p/app', startedAt: '2026-07-05T14:00:00.000Z', endedAt: '2026-07-05T14:10:00.000Z' });
   store.insertFileTouch({ sessionId: 'abc123', path: '/p/app/a.ts', action: 'edit', ts: '2026-07-05T14:03:00.000Z', uniqKey: 't1' });
-  const started = await startServer(store, 0); // port 0 => OS-assigned free port
+  const started = await startServer(store, 0, tmp); // port 0 => OS-assigned free port; tmp has no HTML
   server = started.server;
   base = started.url;
 });
@@ -102,5 +102,53 @@ describe('http server', () => {
       store2.close();
       fs.rmSync(tmp2, { recursive: true, force: true });
     }
+  });
+});
+
+describe('http server — static serving', () => {
+  let servingServer: Server;
+  let servingUrl: string;
+  let distDir: string;
+  let servingStore: Store;
+  let servingTmp: string;
+
+  beforeEach(async () => {
+    servingTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-srv-'));
+    distDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-web-'));
+    fs.writeFileSync(path.join(distDir, 'index.html'), '<html><body>SPA</body></html>');
+    servingStore = openStore(path.join(servingTmp, 'db.sqlite'));
+    const started = await startServer(servingStore, 0, distDir);
+    servingServer = started.server;
+    servingUrl = started.url;
+  });
+
+  afterEach(() => {
+    servingServer.close();
+    servingStore.close();
+    fs.rmSync(servingTmp, { recursive: true, force: true });
+    fs.rmSync(distDir, { recursive: true, force: true });
+  });
+
+  it('serves the SPA index for the root', async () => {
+    const res = await fetch(`${servingUrl}/`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toMatch(/text\/html/);
+  });
+
+  it('serves index.html for client routes (no extension, no match)', async () => {
+    const res = await fetch(`${servingUrl}/session/abc`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toMatch(/text\/html/);
+  });
+
+  it('still serves JSON for /api routes (no regression)', async () => {
+    const res = await fetch(`${servingUrl}/api/sessions`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toMatch(/application\/json/);
+  });
+
+  it('returns 404 for a missing asset with an extension', async () => {
+    const res = await fetch(`${servingUrl}/assets/missing.js`);
+    expect(res.status).toBe(404);
   });
 });
