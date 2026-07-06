@@ -8,17 +8,27 @@ spent — and turns it into an auditable timeline.
 
 ## Install
 
-Not published to npm yet — run from a clone:
+Requires Node.js ≥ 20.
 
 ```bash
-git clone <repo> flightbox && cd flightbox
-npm install
-npm run build
-npm link            # puts `flightbox` on your PATH
+npm install -g flightbox
 
 flightbox install   # registers hooks in ~/.claude/settings.json
 flightbox list      # your past sessions are already there
 flightbox ui        # open the web UI
+```
+
+Or run without installing:
+
+```bash
+npx flightbox list
+```
+
+### From source
+
+```bash
+git clone https://github.com/VictorLG98/flightbox.git && cd flightbox
+npm install && npm run build && npm link
 ```
 
 ## Commands
