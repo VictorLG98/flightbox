@@ -8,10 +8,17 @@ spent — and turns it into an auditable timeline.
 
 ## Install
 
+Not published to npm yet — run from a clone:
+
 ```bash
-npm install -g flightbox
+git clone <repo> flightbox && cd flightbox
+npm install
+npm run build
+npm link            # puts `flightbox` on your PATH
+
 flightbox install   # registers hooks in ~/.claude/settings.json
 flightbox list      # your past sessions are already there
+flightbox ui        # open the web UI
 ```
 
 ## Commands

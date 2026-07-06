@@ -8,6 +8,8 @@ import { cmdUi } from './commands/ui.js';
 import { dbPath, flightboxHome } from './paths.js';
 import { VERSION } from './version.js';
 import fs from 'node:fs';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const HELP = `flightbox ${VERSION} — local flight recorder for coding agent sessions
 
@@ -74,7 +76,19 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
-const isDirectRun = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+// Detect direct execution robustly, including when invoked via a symlinked bin
+// (npm install / npm link put a symlink on PATH, so argv[1] is the link path
+// while import.meta.url is the resolved real path — a bare string compare fails).
+const isDirectRun = (() => {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  const self = fileURLToPath(import.meta.url);
+  try {
+    return realpathSync(entry) === self;
+  } catch {
+    return entry === self;
+  }
+})();
 if (isDirectRun) {
   main(process.argv.slice(2))
     .then((code) => {
