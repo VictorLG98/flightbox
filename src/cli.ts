@@ -4,6 +4,7 @@ import { cmdList } from './commands/list.js';
 import { cmdShow } from './commands/show.js';
 import { cmdStats } from './commands/stats.js';
 import { cmdInstall } from './commands/install.js';
+import { cmdUi } from './commands/ui.js';
 import { dbPath, flightboxHome } from './paths.js';
 import { VERSION } from './version.js';
 import fs from 'node:fs';
@@ -15,6 +16,7 @@ Usage:
   flightbox list        recent sessions
   flightbox show <id>   session timeline
   flightbox stats       token usage aggregates
+  flightbox ui          open the local web UI (Ctrl-C to stop)
   flightbox collect     (internal) hook entry point, reads stdin
 `;
 
@@ -55,6 +57,8 @@ export async function main(argv: string[]): Promise<number> {
     case 'stats':
       await withStore((s) => cmdStats(s));
       return 0;
+    case 'ui':
+      return await cmdUi();
     case '--version':
     case '-v':
       console.log(VERSION);
