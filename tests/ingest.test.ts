@@ -92,4 +92,20 @@ describe('runIngest', () => {
     process.env.FLIGHTBOX_CLAUDE_HOME = path.join(tmp, 'nope2');
     expect(() => runIngest(store)).not.toThrow();
   });
+
+  it('records attempted file_touches for a hook-less transcript session', () => {
+    const proj = path.join(tmp, 'claude', 'projects', '-p-app');
+    fs.writeFileSync(
+      path.join(proj, 's-edit.jsonl'),
+      JSON.stringify({
+        type: 'assistant', uuid: 'e1', timestamp: '2026-07-05T14:03:00.000Z',
+        sessionId: 's-edit', cwd: '/p/app', isSidechain: false,
+        message: { model: 'claude-sonnet-4-6', content: [
+          { type: 'tool_use', name: 'Edit', input: { file_path: '/p/app/a.ts' } },
+        ] },
+      }) + '\n',
+    );
+    runIngest(store);
+    expect(store.claimsForSession('s-edit')).toEqual([{ path: '/p/app/a.ts', status: 'attempted' }]);
+  });
 });
