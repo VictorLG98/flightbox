@@ -1,9 +1,10 @@
 import { classifyTool, makeUniqKey } from '../atf.js';
-import type { AtfEvent, SessionPatch, TokenUsageInput } from '../atf.js';
+import type { AtfEvent, SessionPatch, TokenUsageInput, FileTouchInput } from '../atf.js';
 
 export interface TranscriptNorm {
   usage?: TokenUsageInput;
   events: AtfEvent[];
+  touches: FileTouchInput[];
   session?: SessionPatch;
 }
 
@@ -21,7 +22,7 @@ export function normalizeTranscriptLine(line: string): TranscriptNorm | null {
   const session: SessionPatch = { id: sessionId, startedAt: ts, endedAt: ts };
   if (typeof obj.cwd === 'string') session.projectDir = obj.cwd;
 
-  const out: TranscriptNorm = { events: [], session };
+  const out: TranscriptNorm = { events: [], touches: [], session };
   if (obj.type !== 'assistant' || !obj.message) return out;
 
   const msg = obj.message;
@@ -54,6 +55,12 @@ export function normalizeTranscriptLine(line: string): TranscriptNorm | null {
       sidechain: !!obj.isSidechain,
       uniqKey: makeUniqKey('transcript', String(obj.uuid ?? ts), String(i), block.name),
     });
+    if (c.touch) {
+      out.touches.push({
+        sessionId, path: c.touch.path, action: c.touch.action, ts,
+        uniqKey: makeUniqKey('transcript-touch', String(obj.uuid ?? ts), String(i), block.name),
+      });
+    }
   });
 
   return out;

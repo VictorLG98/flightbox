@@ -1,6 +1,9 @@
+import fs from 'node:fs';
 import http, { type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { Store } from '../store.js';
+import { webDistDir } from '../paths.js';
 import { sessionListDto, sessionDetailDto, claimsDto } from './store-api.js';
+import { resolveStaticFile } from './static.js';
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const json = JSON.stringify(body);
@@ -23,7 +26,7 @@ function decodeId(raw: string): string | null {
   return decoded;
 }
 
-export function createServer(store: Store): Server {
+export function createServer(store: Store, distDir: string = webDistDir()): Server {
   return http.createServer((req: IncomingMessage, res: ServerResponse) => {
     if (req.method !== 'GET') {
       sendJson(res, 405, { error: 'method not allowed' });
@@ -53,6 +56,18 @@ export function createServer(store: Store): Server {
         return;
       }
     }
+    // Any unmatched /api/* route is a JSON 404 — never fall through to the SPA.
+    if (parts[0] === 'api') {
+      sendJson(res, 404, { error: 'not found' });
+      return;
+    }
+    // Non-API GET: serve the built SPA (static asset or client-route fallback).
+    const resolved = resolveStaticFile(distDir, url.pathname);
+    if (resolved) {
+      res.writeHead(200, { 'content-type': resolved.contentType });
+      fs.createReadStream(resolved.filePath).pipe(res);
+      return;
+    }
     sendJson(res, 404, { error: 'not found' });
   });
 }
@@ -60,9 +75,10 @@ export function createServer(store: Store): Server {
 export function startServer(
   store: Store,
   portStart = 51789,
+  distDir: string = webDistDir(),
 ): Promise<{ server: Server; port: number; url: string }> {
   return new Promise((resolve, reject) => {
-    const server = createServer(store);
+    const server = createServer(store, distDir);
     let port = portStart;
     const tryListen = () => {
       server.listen(port, '127.0.0.1');

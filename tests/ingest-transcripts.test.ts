@@ -69,3 +69,27 @@ describe('normalizeTranscriptLine', () => {
     expect(normalizeTranscriptLine('{"type":"summary"}')).toBeNull();
   });
 });
+
+describe('normalizeTranscriptLine file_touches', () => {
+  it('emits an edit touch for an Edit tool_use block', () => {
+    const line = JSON.stringify({
+      sessionId: 's1', timestamp: '2026-07-06T10:00:00Z', type: 'assistant', uuid: 'u1',
+      message: { model: 'claude-x', content: [
+        { type: 'tool_use', name: 'Edit', input: { file_path: '/repo/a.ts' } },
+      ] },
+    });
+    const norm = normalizeTranscriptLine(line);
+    expect(norm?.touches).toEqual([
+      expect.objectContaining({ sessionId: 's1', path: '/repo/a.ts', action: 'edit', ts: '2026-07-06T10:00:00Z' }),
+    ]);
+    expect(norm?.touches[0].uniqKey).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it('emits no touches for a Bash tool_use block', () => {
+    const line = JSON.stringify({
+      sessionId: 's1', timestamp: '2026-07-06T10:00:00Z', type: 'assistant', uuid: 'u2',
+      message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'ls' } }] },
+    });
+    expect(normalizeTranscriptLine(line)?.touches).toEqual([]);
+  });
+});

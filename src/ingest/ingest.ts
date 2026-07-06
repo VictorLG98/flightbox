@@ -65,7 +65,10 @@ function ingestTranscripts(store: Store): void {
       // a session are dropped (unattributable without a session).
       const sessionId = norms.find((n) => n.session)?.session?.id;
       if (sessionId && store.hookEventCount(sessionId) === 0) {
-        for (const n of norms) for (const e of n.events) store.insertEvent(e);
+        for (const n of norms) {
+          for (const e of n.events) store.insertEvent(e);
+          for (const t of n.touches) store.insertFileTouch(t);
+        }
       }
     }
   }
