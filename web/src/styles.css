@@ -1,7 +1,7 @@
 /* ==========================================================================
-   flightbox — flight data recorder UI
-   Aesthetic: aviation cockpit / black-box telemetry. Near-black instrument
-   panel, flight-recorder amber, HUD type (Chakra Petch) + data mono
+   tracebox — session trace recorder UI
+   Aesthetic: mission-control telemetry. Near-black instrument
+   panel, signal amber, HUD type (Chakra Petch) + data mono
    (JetBrains Mono), status LEDs, radar grid, CRT grain.
    ========================================================================== */
 
@@ -13,7 +13,7 @@
   --line: rgba(120, 200, 220, 0.09);
   --line-strong: rgba(255, 168, 76, 0.22);
 
-  --amber: #ff9a2e;        /* flight-recorder orange — primary accent */
+  --amber: #ff9a2e;        /* signal orange — primary accent */
   --amber-soft: #ffb768;
   --amber-glow: rgba(255, 154, 46, 0.35);
   --cyan: #4fe0c4;         /* telemetry "ok" green-cyan */
@@ -182,13 +182,13 @@ body::after {
 .back:hover { color: var(--amber); }
 
 /* ----------------------------------------------------------- session list */
-.flightlog {
+.logtable {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--mono);
   font-size: 13px;
 }
-.flightlog thead th {
+.logtable thead th {
   text-align: left;
   font-family: var(--hud);
   font-weight: 600;
@@ -199,33 +199,33 @@ body::after {
   padding: 0 16px 12px;
   border-bottom: 1px solid var(--line-strong);
 }
-.flightlog tbody tr {
+.logtable tbody tr {
   border-bottom: 1px solid var(--line);
   transition: background 0.14s;
   animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   animation-delay: calc(var(--i, 0) * 34ms);
 }
-.flightlog tbody tr:hover { background: rgba(255, 154, 46, 0.05); }
-.flightlog tbody td {
+.logtable tbody tr:hover { background: rgba(255, 154, 46, 0.05); }
+.logtable tbody td {
   padding: 13px 16px;
   color: var(--text);
   vertical-align: middle;
 }
-.flightlog td.id a {
+.logtable td.id a {
   color: var(--amber);
   text-decoration: none;
   letter-spacing: 0.08em;
   border-bottom: 1px solid transparent;
   transition: border-color 0.14s, text-shadow 0.14s;
 }
-.flightlog tr:hover td.id a {
+.logtable tr:hover td.id a {
   border-color: var(--amber);
   text-shadow: 0 0 12px var(--amber-glow);
 }
-.flightlog td.project { color: var(--text); font-family: var(--hud); letter-spacing: 0.02em; }
-.flightlog td.dim { color: var(--muted); }
-.flightlog td.num { color: var(--cyan); text-align: right; }
-.flightlog td.badge { text-align: center; width: 42px; }
+.logtable td.project { color: var(--text); font-family: var(--hud); letter-spacing: 0.02em; }
+.logtable td.dim { color: var(--muted); }
+.logtable td.num { color: var(--cyan); text-align: right; }
+.logtable td.badge { text-align: center; width: 42px; }
 
 .warn-led {
   display: inline-flex;
@@ -483,5 +483,5 @@ body::after {
   .event { grid-template-columns: 1fr; gap: 4px; }
   .event time { text-align: left; }
   .event .body::before { display: none; }
-  .flightlog td.project { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .logtable td.project { max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }

@@ -27,8 +27,8 @@ function transcriptLine(over: Record<string, unknown> = {}): string {
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-'));
-  process.env.FLIGHTBOX_HOME = path.join(tmp, 'fbx');
-  process.env.FLIGHTBOX_CLAUDE_HOME = path.join(tmp, 'claude');
+  process.env.TRACEBOX_HOME = path.join(tmp, 'fbx');
+  process.env.TRACEBOX_CLAUDE_HOME = path.join(tmp, 'claude');
 
   fs.mkdirSync(path.join(tmp, 'fbx', 'raw'), { recursive: true });
   fs.writeFileSync(
@@ -88,8 +88,8 @@ describe('runIngest', () => {
   });
 
   it('survives missing source directories', () => {
-    process.env.FLIGHTBOX_HOME = path.join(tmp, 'nope1');
-    process.env.FLIGHTBOX_CLAUDE_HOME = path.join(tmp, 'nope2');
+    process.env.TRACEBOX_HOME = path.join(tmp, 'nope1');
+    process.env.TRACEBOX_CLAUDE_HOME = path.join(tmp, 'nope2');
     expect(() => runIngest(store)).not.toThrow();
   });
 

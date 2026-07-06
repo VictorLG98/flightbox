@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { claudeSettingsPath, flightboxHome } from '../paths.js';
+import { claudeSettingsPath, traceboxHome } from '../paths.js';
 
 const HOOK_EVENTS = ['SessionStart', 'PreToolUse', 'PostToolUse', 'Stop'] as const;
-const COLLECT_ENTRY = { hooks: [{ type: 'command', command: 'flightbox collect' }] };
+const COLLECT_ENTRY = { hooks: [{ type: 'command', command: 'tracebox collect' }] };
 
 export function buildHookConfig(settings: Record<string, unknown>): Record<string, unknown> {
   const out = structuredClone(settings);
@@ -12,7 +12,7 @@ export function buildHookConfig(settings: Record<string, unknown>): Record<strin
   for (const ev of HOOK_EVENTS) {
     const entries = Array.isArray(hooks[ev]) ? hooks[ev] : [];
     hooks[ev] = entries;
-    if (!JSON.stringify(entries).includes('flightbox collect')) {
+    if (!JSON.stringify(entries).includes('tracebox collect')) {
       entries.push(structuredClone(COLLECT_ENTRY));
     }
   }
@@ -21,7 +21,7 @@ export function buildHookConfig(settings: Record<string, unknown>): Record<strin
 
 export function cmdInstall(): number {
   try {
-    fs.mkdirSync(flightboxHome(), { recursive: true });
+    fs.mkdirSync(traceboxHome(), { recursive: true });
     const file = claudeSettingsPath();
     let settings: Record<string, unknown> = {};
     try {
@@ -39,8 +39,8 @@ export function cmdInstall(): number {
     const updated = buildHookConfig(settings);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, JSON.stringify(updated, null, 2) + '\n');
-    console.log(`flightbox hooks registered in ${file}`);
-    console.log('Past sessions are already visible: try `flightbox list`');
+    console.log(`tracebox hooks registered in ${file}`);
+    console.log('Past sessions are already visible: try `tracebox list`');
     return 0;
   } catch (err) {
     console.error(`install failed: ${err instanceof Error ? err.message : String(err)}`);

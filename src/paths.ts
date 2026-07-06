@@ -2,20 +2,20 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export function flightboxHome(): string {
-  return process.env.FLIGHTBOX_HOME ?? path.join(os.homedir(), '.flightbox');
+export function traceboxHome(): string {
+  return process.env.TRACEBOX_HOME ?? path.join(os.homedir(), '.tracebox');
 }
 
 export function rawLogDir(): string {
-  return path.join(flightboxHome(), 'raw');
+  return path.join(traceboxHome(), 'raw');
 }
 
 export function dbPath(): string {
-  return path.join(flightboxHome(), 'db.sqlite');
+  return path.join(traceboxHome(), 'db.sqlite');
 }
 
 export function claudeHome(): string {
-  return process.env.FLIGHTBOX_CLAUDE_HOME ?? path.join(os.homedir(), '.claude');
+  return process.env.TRACEBOX_CLAUDE_HOME ?? path.join(os.homedir(), '.claude');
 }
 
 export function claudeProjectsDir(): string {

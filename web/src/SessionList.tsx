@@ -19,7 +19,7 @@ export function SessionList() {
   return (
     <>
       <p className="section-label">Recorded sessions · {sessions.length}</p>
-      <table className="flightlog">
+      <table className="logtable">
         <thead>
           <tr>
             <th>Session</th><th>Project</th><th>Started</th>

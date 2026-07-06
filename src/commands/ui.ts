@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import { dbPath, flightboxHome } from '../paths.js';
+import { dbPath, traceboxHome } from '../paths.js';
 
 export interface UiDeps {
   ingest: () => void;
@@ -13,7 +13,7 @@ export function runUi(deps: UiDeps): Promise<number> {
   return new Promise((resolve) => {
     deps.ingest();
     deps.start().then(({ url, close }) => {
-      deps.log(`flightbox UI running at ${url} — press Ctrl-C to stop`);
+      deps.log(`tracebox UI running at ${url} — press Ctrl-C to stop`);
       deps.open(url);
       deps.onStop(() => {
         close();
@@ -30,7 +30,7 @@ export async function cmdUi(): Promise<number> {
     import('../server/server.js'),
     import('../browser.js'),
   ]);
-  fs.mkdirSync(flightboxHome(), { recursive: true });
+  fs.mkdirSync(traceboxHome(), { recursive: true });
   const store = openStore(dbPath());
   return runUi({
     ingest: () => runIngest(store),

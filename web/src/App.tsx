@@ -8,8 +8,8 @@ export function App() {
     <>
       <header className="cockpit-header">
         <a className="brand" href="#/">
-          <span className="mark">flight<b>box</b></span>
-          <span className="sub">flight data recorder</span>
+          <span className="mark">trace<b>box</b></span>
+          <span className="sub">session trace recorder</span>
         </a>
         <span className="rec"><span className="led" aria-hidden="true" />REC · LOCAL</span>
       </header>

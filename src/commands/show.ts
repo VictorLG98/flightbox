@@ -12,7 +12,7 @@ function duration(start: string | null, end: string | null): string {
 export function cmdShow(store: Store, idPrefix: string): number {
   const s = store.findSession(idPrefix);
   if (!s) {
-    console.error(`No session matching '${idPrefix}'. Try: flightbox list`);
+    console.error(`No session matching '${idPrefix}'. Try: tracebox list`);
     return 1;
   }
   const tokens = store.sessionTokens(s.id);

@@ -9,8 +9,8 @@ let tmp: string;
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-'));
-  process.env.FLIGHTBOX_HOME = path.join(tmp, 'fbx');
-  process.env.FLIGHTBOX_CLAUDE_HOME = path.join(tmp, 'claude');
+  process.env.TRACEBOX_HOME = path.join(tmp, 'fbx');
+  process.env.TRACEBOX_CLAUDE_HOME = path.join(tmp, 'claude');
 
   // one past transcript session so list has content (backfill path)
   const proj = path.join(tmp, 'claude', 'projects', '-p-app');

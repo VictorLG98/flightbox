@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Regression: when flightbox is installed as a command, npm puts a SYMLINK on
+// Regression: when tracebox is installed as a command, npm puts a SYMLINK on
 // PATH pointing at dist/cli.js. The direct-run detection must resolve that
 // symlink, or `main()` never runs and every command is a silent no-op.
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -20,7 +20,7 @@ describe('CLI invoked via a symlink (npm-bin style)', () => {
 
   it('runs main() through a symlinked bin and prints the version', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-link-'));
-    const link = path.join(dir, 'flightbox');
+    const link = path.join(dir, 'tracebox');
     fs.symlinkSync(cli, link);
     const out = execFileSync(process.execPath, [link, '--version'], { encoding: 'utf8' }).trim();
     expect(out).toMatch(/^\d+\.\d+\.\d+$/);

@@ -1,17 +1,17 @@
 {
-  "name": "flightbox",
+  "name": "tracebox",
   "version": "0.1.0",
-  "description": "Local-first flight recorder for coding agent sessions — records what Claude Code actually did into an auditable timeline",
+  "description": "Local-first trace recorder for coding agent sessions — records what Claude Code actually did into an auditable timeline",
   "type": "module",
   "license": "MIT",
   "author": "Victor LG (https://github.com/VictorLG98)",
-  "homepage": "https://github.com/VictorLG98/flightbox#readme",
+  "homepage": "https://github.com/VictorLG98/tracebox#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/VictorLG98/flightbox.git"
+    "url": "git+https://github.com/VictorLG98/tracebox.git"
   },
   "bugs": {
-    "url": "https://github.com/VictorLG98/flightbox/issues"
+    "url": "https://github.com/VictorLG98/tracebox/issues"
   },
   "keywords": [
     "claude-code",
@@ -19,14 +19,14 @@
     "ai-agents",
     "observability",
     "session-recorder",
-    "flight-recorder",
+    "audit-log",
     "telemetry",
     "local-first",
     "cli",
     "developer-tools"
   ],
   "bin": {
-    "flightbox": "dist/cli.js"
+    "tracebox": "dist/cli.js"
   },
   "files": [
     "dist"

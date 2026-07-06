@@ -5,21 +5,21 @@ import { cmdShow } from './commands/show.js';
 import { cmdStats } from './commands/stats.js';
 import { cmdInstall } from './commands/install.js';
 import { cmdUi } from './commands/ui.js';
-import { dbPath, flightboxHome } from './paths.js';
+import { dbPath, traceboxHome } from './paths.js';
 import { VERSION } from './version.js';
 import fs from 'node:fs';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const HELP = `flightbox ${VERSION} — local flight recorder for coding agent sessions
+const HELP = `tracebox ${VERSION} — local trace recorder for coding agent sessions
 
 Usage:
-  flightbox install     register hooks in ~/.claude/settings.json
-  flightbox list        recent sessions
-  flightbox show <id>   session timeline
-  flightbox stats       token usage aggregates
-  flightbox ui          open the local web UI (Ctrl-C to stop)
-  flightbox collect     (internal) hook entry point, reads stdin
+  tracebox install     register hooks in ~/.claude/settings.json
+  tracebox list        recent sessions
+  tracebox show <id>   session timeline
+  tracebox stats       token usage aggregates
+  tracebox ui          open the local web UI (Ctrl-C to stop)
+  tracebox collect     (internal) hook entry point, reads stdin
 `;
 
 async function withStore<T>(fn: (store: import('./store.js').Store) => T): Promise<T> {
@@ -27,7 +27,7 @@ async function withStore<T>(fn: (store: import('./store.js').Store) => T): Promi
     import('./store.js'),
     import('./ingest/ingest.js'),
   ]);
-  fs.mkdirSync(flightboxHome(), { recursive: true });
+  fs.mkdirSync(traceboxHome(), { recursive: true });
   const store = openStore(dbPath());
   try {
     runIngest(store);
@@ -51,7 +51,7 @@ export async function main(argv: string[]): Promise<number> {
     case 'show': {
       const idPrefix = argv[1];
       if (!idPrefix) {
-        console.error('Usage: flightbox show <session-id-prefix>');
+        console.error('Usage: tracebox show <session-id-prefix>');
         return 1;
       }
       return await withStore((s) => cmdShow(s, idPrefix));

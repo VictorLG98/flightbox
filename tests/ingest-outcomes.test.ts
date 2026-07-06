@@ -14,8 +14,8 @@ function hookLine(payload: unknown): string {
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-'));
-  process.env.FLIGHTBOX_HOME = path.join(tmp, 'fbx');
-  process.env.FLIGHTBOX_CLAUDE_HOME = path.join(tmp, 'claude');
+  process.env.TRACEBOX_HOME = path.join(tmp, 'fbx');
+  process.env.TRACEBOX_CLAUDE_HOME = path.join(tmp, 'claude');
   fs.mkdirSync(path.join(tmp, 'fbx', 'raw'), { recursive: true });
   fs.writeFileSync(
     path.join(tmp, 'fbx', 'raw', 'hooks-2026-07-05.jsonl'),

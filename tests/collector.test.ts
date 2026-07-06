@@ -10,7 +10,7 @@ let tmp: string;
 
 beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fbx-'));
-  process.env.FLIGHTBOX_HOME = tmp;
+  process.env.TRACEBOX_HOME = tmp;
 });
 
 function rawLines(): string[] {
@@ -43,8 +43,8 @@ describe('collect', () => {
     expect(rawLines()).toHaveLength(0);
   });
 
-  it('never throws even if FLIGHTBOX_HOME is unwritable', async () => {
-    process.env.FLIGHTBOX_HOME = '/dev/null/nope';
+  it('never throws even if TRACEBOX_HOME is unwritable', async () => {
+    process.env.TRACEBOX_HOME = '/dev/null/nope';
     await expect(collect(Readable.from(['{"a":1}']))).resolves.toBeUndefined();
   });
 });

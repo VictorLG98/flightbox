@@ -60,7 +60,7 @@ function ingestTranscripts(store: Store): void {
       }
 
       // Hook events are the primary source; transcripts only backfill sessions
-      // recorded before flightbox was installed. Claude Code writes one session
+      // recorded before tracebox was installed. Claude Code writes one session
       // per transcript file, so gating on the first found is safe. Events without
       // a session are dropped (unattributable without a session).
       const sessionId = norms.find((n) => n.session)?.session?.id;
