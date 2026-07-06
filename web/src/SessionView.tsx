@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { fetchSession } from './api.js';
 import type { SessionDetail } from './types.js';
+import { ClaimsPanel } from './ClaimsPanel.js';
 import { formatTokens, formatDuration } from './format.js';
 import { Timeline } from './Timeline.js';
 
@@ -31,7 +32,7 @@ export function SessionView({ id }: { id: string }) {
         </dl>
       </header>
       <Timeline events={detail.events} />
-      {/* ClaimsPanel added in Task 5 */}
+      <ClaimsPanel id={id} />
     </article>
   );
 }
