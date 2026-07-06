@@ -32,6 +32,12 @@
 - `src/cli.ts` (modify) — route `ui`, extend HELP.
 - `package.json` (modify) — devDeps, `build` = `tsc && vite build`, `build:web`, `files` includes web assets.
 
+**Test convention (IMPORTANT):** This repo keeps ALL tests in `tests/` at the
+repo root (e.g. `tests/ingest.test.ts`), importing source as `../src/<path>.js`.
+There are NO co-located `*.test.ts` files under `src/`. Every backend test in
+this plan goes in `tests/`, and web tests go under `web/src/`. The existing 69
+tests all live in `tests/` — do not break their discovery.
+
 **Frontend (Vite/React, `web/**`):**
 - `web/index.html` — Vite entry.
 - `web/vite.config.ts` — React plugin, `base: './'`, `build.outDir` = `../dist/web`, dev proxy `/api` → `127.0.0.1:51789`.
@@ -56,7 +62,7 @@
 **Files:**
 - Modify: `src/ingest/transcripts.ts`
 - Modify: `src/ingest/ingest.ts`
-- Test: `src/ingest/transcripts.test.ts` (add cases), `src/ingest/ingest.test.ts` (add case) — create if absent.
+- Test: `tests/ingest-transcripts.test.ts` (append cases), `tests/ingest.test.ts` (append case) — both files already exist.
 
 **Interfaces:**
 - Consumes: `classifyTool` (returns optional `touch: {path, action}`), `makeUniqKey`, `FileTouchInput` from `../atf.js`.
@@ -64,11 +70,11 @@
 
 - [ ] **Step 1: Write the failing test (transcripts emits a touch)**
 
-Add to `src/ingest/transcripts.test.ts`:
+Append to `tests/ingest-transcripts.test.ts` (it already imports `normalizeTranscriptLine` from `../src/ingest/transcripts.js` and has a `describe` block — add a new `describe` after the existing one):
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { normalizeTranscriptLine } from './transcripts.js';
+import { normalizeTranscriptLine } from '../src/ingest/transcripts.js';
 
 describe('normalizeTranscriptLine file_touches', () => {
   it('emits an edit touch for an Edit tool_use block', () => {
@@ -97,7 +103,7 @@ describe('normalizeTranscriptLine file_touches', () => {
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `npx vitest run src/ingest/transcripts.test.ts`
+Run: `npx vitest run tests/ingest-transcripts.test.ts`
 Expected: FAIL — `touches` is undefined on `TranscriptNorm`.
 
 - [ ] **Step 3: Implement**
@@ -137,26 +143,35 @@ Inside the `content.forEach` callback, after pushing the event, emit a touch whe
 
 - [ ] **Step 4: Run to verify transcript test passes**
 
-Run: `npx vitest run src/ingest/transcripts.test.ts`
+Run: `npx vitest run tests/ingest-transcripts.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Write the failing ingest test (touches persisted for hook-less session → attempted claim)**
 
-Add to `src/ingest/ingest.test.ts` (create the file if it does not exist; import `openStore` and set `FLIGHTBOX_HOME`/`FLIGHTBOX_CLAUDE_HOME` to temp dirs the way existing ingest tests do — inspect the existing test setup and mirror it). The essential assertion:
+Append a new `it(...)` to the existing `describe('runIngest', ...)` in `tests/ingest.test.ts`. That file's `beforeEach` already sets `FLIGHTBOX_HOME`/`FLIGHTBOX_CLAUDE_HOME` to temp dirs and creates `tmp/claude/projects/-p-app/`. Write a NEW hook-less transcript file there containing an `Edit` tool_use, then re-open/ingest. Model it on the existing `transcriptLine()` helper but with an Edit block. Concretely:
 
 ```ts
-// After writing a transcript file (no hooks) containing an Edit tool_use for /repo/a.ts
-// and running runIngest(store):
-const claims = store.claimsForSession(sessionId);
-expect(claims).toEqual([{ path: '/repo/a.ts', status: 'attempted' }]);
+it('records attempted file_touches for a hook-less transcript session', () => {
+  const proj = path.join(tmp, 'claude', 'projects', '-p-app');
+  fs.writeFileSync(
+    path.join(proj, 's-edit.jsonl'),
+    JSON.stringify({
+      type: 'assistant', uuid: 'e1', timestamp: '2026-07-05T14:03:00.000Z',
+      sessionId: 's-edit', cwd: '/p/app', isSidechain: false,
+      message: { model: 'claude-sonnet-4-6', content: [
+        { type: 'tool_use', name: 'Edit', input: { file_path: '/p/app/a.ts' } },
+      ] },
+    }) + '\n',
+  );
+  runIngest(store);
+  expect(store.claimsForSession('s-edit')).toEqual([{ path: '/p/app/a.ts', status: 'attempted' }]);
+});
 ```
-
-If no `ingest.test.ts` exists, model the harness on how `transcripts` fixtures + `openStore(':memory:')` are used elsewhere: write the transcript JSONL into a temp `FLIGHTBOX_CLAUDE_HOME/projects/<dir>/x.jsonl`, point `claudeProjectsDir()` at it via env, `runIngest(openStore(':memory:'))`, assert.
 
 - [ ] **Step 6: Run to verify it fails**
 
-Run: `npx vitest run src/ingest/ingest.test.ts`
-Expected: FAIL — claims empty because touches aren't inserted.
+Run: `npx vitest run tests/ingest.test.ts`
+Expected: FAIL — claims empty because touches aren't inserted for transcript sessions.
 
 - [ ] **Step 7: Implement ingest persistence**
 
@@ -176,13 +191,13 @@ Gating on `hookEventCount === 0` prevents double-counting when hooks already rec
 
 - [ ] **Step 8: Run all ingest tests**
 
-Run: `npx vitest run src/ingest/`
-Expected: PASS (new + existing, no regression).
+Run: `npx vitest run tests/ingest.test.ts tests/ingest-transcripts.test.ts`
+Expected: PASS (new + existing, no regression). Then run the whole suite once (`npx vitest run`) to confirm zero regressions before committing.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/ingest/transcripts.ts src/ingest/ingest.ts src/ingest/transcripts.test.ts src/ingest/ingest.test.ts
+git add src/ingest/transcripts.ts src/ingest/ingest.ts tests/ingest-transcripts.test.ts tests/ingest.test.ts
 git commit -m "feat: emit file_touches from transcripts so degraded mode shows attempted edits"
 ```
 
@@ -217,10 +232,13 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'node', // web tests opt into jsdom via `// @vitest-environment jsdom`
-    include: ['src/**/*.test.ts', 'web/src/**/*.test.{ts,tsx}'],
+    // MUST include the existing tests/ dir (69 tests live there) plus the new web tests.
+    include: ['tests/**/*.test.ts', 'web/src/**/*.test.{ts,tsx}'],
   },
 });
 ```
+
+After creating this config, run `npx vitest run` and confirm all 69 existing tests still run and pass — a wrong `include` here silently drops the whole existing suite.
 
 - [ ] **Step 3: Create `web/tsconfig.json`**
 
@@ -1013,7 +1031,7 @@ git commit -m "feat: claims-vs-reality panel with degraded-mode warning"
 **Files:**
 - Create: `src/server/static.ts`
 - Modify: `src/paths.ts` (add `webDistDir`), `src/server/server.ts`
-- Test: `src/server/static.test.ts`, `src/server/server.test.ts` (add serving cases)
+- Test: `tests/static.test.ts` (create), `tests/server.test.ts` (append serving cases)
 
 **Interfaces:**
 - Consumes: `webDistDir()` from `../paths.js`.
@@ -1033,14 +1051,14 @@ export function webDistDir(): string {
 
 - [ ] **Step 2: Write the failing static resolver test**
 
-`src/server/static.test.ts`:
+`tests/static.test.ts`:
 
 ```ts
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { resolveStaticFile, contentTypeFor } from './static.js';
+import { resolveStaticFile, contentTypeFor } from '../src/server/static.js';
 
 let dist: string;
 beforeAll(() => {
@@ -1085,7 +1103,7 @@ describe('resolveStaticFile', () => {
 
 - [ ] **Step 3: Run to verify it fails**
 
-Run: `npx vitest run src/server/static.test.ts`
+Run: `npx vitest run tests/static.test.ts`
 Expected: FAIL — module not implemented.
 
 - [ ] **Step 4: Implement `src/server/static.ts`**
@@ -1135,11 +1153,11 @@ export function resolveStaticFile(
 
 - [ ] **Step 5: Run to verify static test passes**
 
-Run: `npx vitest run src/server/static.test.ts` → PASS.
+Run: `npx vitest run tests/static.test.ts` → PASS.
 
 - [ ] **Step 6: Write the failing server serving test**
 
-Add to `src/server/server.test.ts` (mirror the existing `startServer` + `fetch` harness used there):
+Add to `tests/server.test.ts` (mirror the existing `startServer` + `fetch` harness used there — read that file first to reuse its store fixture and `url` variable):
 
 ```ts
 // within the existing describe that starts the server against a fixture store:
@@ -1162,7 +1180,7 @@ To make the dist dir injectable for tests, `createServer`/`startServer` gain an 
 
 - [ ] **Step 7: Run to verify it fails**
 
-Run: `npx vitest run src/server/server.test.ts`
+Run: `npx vitest run tests/server.test.ts`
 Expected: FAIL — non-API routes currently return `404 {error:'not found'}`.
 
 - [ ] **Step 8: Modify `src/server/server.ts`**
@@ -1203,13 +1221,13 @@ export function startServer(
 
 - [ ] **Step 9: Run server + full backend suite**
 
-Run: `npx vitest run src/server/` then `npx vitest run` (whole suite)
+Run: `npx vitest run tests/static.test.ts tests/server.test.ts` then `npx vitest run` (whole suite)
 Expected: PASS, including existing API tests (no regression). Malformed-id → 404 tests still pass (those are `/api/...` routes, handled before the static fallback).
 
 - [ ] **Step 10: Commit**
 
 ```bash
-git add src/server/static.ts src/server/static.test.ts src/server/server.ts src/server/server.test.ts src/paths.ts
+git add src/server/static.ts tests/static.test.ts src/server/server.ts tests/server.test.ts src/paths.ts
 git commit -m "feat: serve built SPA statically with path-traversal-safe resolver and client-route fallback"
 ```
 
@@ -1220,7 +1238,7 @@ git commit -m "feat: serve built SPA statically with path-traversal-safe resolve
 **Files:**
 - Create: `src/browser.ts`, `src/commands/ui.ts`
 - Modify: `src/cli.ts` (route `ui`, extend HELP)
-- Test: `src/browser.test.ts`, `src/commands/ui.test.ts`
+- Test: `tests/browser.test.ts` (create), `tests/ui.test.ts` (create)
 
 **Interfaces:**
 - Consumes: `startServer` from `../server/server.js`, `runIngest`+`openStore`, `browserOpenCommand`/`openBrowser` from `../browser.js`.
@@ -1228,11 +1246,11 @@ git commit -m "feat: serve built SPA statically with path-traversal-safe resolve
 
 - [ ] **Step 1: Write the failing browser test**
 
-`src/browser.test.ts`:
+`tests/browser.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { browserOpenCommand } from './browser.js';
+import { browserOpenCommand } from '../src/browser.js';
 
 describe('browserOpenCommand', () => {
   it('uses open on macOS', () => {
@@ -1251,7 +1269,7 @@ describe('browserOpenCommand', () => {
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `npx vitest run src/browser.test.ts`
+Run: `npx vitest run tests/browser.test.ts`
 Expected: FAIL — module not implemented.
 
 - [ ] **Step 3: Implement `src/browser.ts`**
@@ -1281,15 +1299,15 @@ export function openBrowser(url: string): void {
 
 - [ ] **Step 4: Run to verify browser test passes**
 
-Run: `npx vitest run src/browser.test.ts` → PASS.
+Run: `npx vitest run tests/browser.test.ts` → PASS.
 
 - [ ] **Step 5: Write the failing `cmdUi` test**
 
-`src/commands/ui.test.ts` — verify wiring without blocking the process: inject seams for ingest/server/open so the test asserts the sequence and that the resolved URL is printed, then simulate SIGINT to resolve.
+`tests/ui.test.ts` — verify wiring without blocking the process: inject seams for ingest/server/open so the test asserts the sequence and that the resolved URL is printed, then simulate SIGINT to resolve.
 
 ```ts
 import { describe, it, expect, vi } from 'vitest';
-import { runUi } from './ui.js';
+import { runUi } from '../src/commands/ui.js';
 
 describe('runUi', () => {
   it('ingests, starts the server, opens the browser, and closes on stop signal', async () => {
@@ -1312,7 +1330,7 @@ describe('runUi', () => {
 
 - [ ] **Step 6: Run to verify it fails**
 
-Run: `npx vitest run src/commands/ui.test.ts`
+Run: `npx vitest run tests/ui.test.ts`
 Expected: FAIL — `runUi` not defined.
 
 - [ ] **Step 7: Implement `src/commands/ui.ts`**
@@ -1369,7 +1387,7 @@ export async function cmdUi(): Promise<number> {
 
 - [ ] **Step 8: Run to verify `cmdUi` test passes**
 
-Run: `npx vitest run src/commands/ui.test.ts` → PASS.
+Run: `npx vitest run tests/ui.test.ts` → PASS.
 
 - [ ] **Step 9: Route `ui` in `src/cli.ts`**
 
@@ -1395,7 +1413,7 @@ Manual smoke (document, do not automate): `FLIGHTBOX_HOME=/tmp/fbx-ui-smoke node
 - [ ] **Step 11: Commit**
 
 ```bash
-git add src/browser.ts src/browser.test.ts src/commands/ui.ts src/commands/ui.test.ts src/cli.ts
+git add src/browser.ts tests/browser.test.ts src/commands/ui.ts tests/ui.test.ts src/cli.ts
 git commit -m "feat: flightbox ui command — ingest, serve, open browser, foreground until Ctrl-C"
 ```
 
