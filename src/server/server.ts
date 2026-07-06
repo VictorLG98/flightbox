@@ -56,6 +56,11 @@ export function createServer(store: Store, distDir: string = webDistDir()): Serv
         return;
       }
     }
+    // Any unmatched /api/* route is a JSON 404 — never fall through to the SPA.
+    if (parts[0] === 'api') {
+      sendJson(res, 404, { error: 'not found' });
+      return;
+    }
     // Non-API GET: serve the built SPA (static asset or client-route fallback).
     const resolved = resolveStaticFile(distDir, url.pathname);
     if (resolved) {

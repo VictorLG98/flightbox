@@ -11,6 +11,7 @@ export function SessionView({ id }: { id: string }) {
 
   useEffect(() => {
     setDetail(null);
+    setError(null);
     fetchSession(id).then(setDetail).catch((e) => setError(String(e)));
   }, [id]);
 

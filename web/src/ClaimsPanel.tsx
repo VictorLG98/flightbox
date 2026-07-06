@@ -10,6 +10,7 @@ export function ClaimsPanel({ id }: { id: string }) {
 
   useEffect(() => {
     setClaims(null);
+    setError(null);
     fetchClaims(id).then(setClaims).catch((e) => setError(String(e)));
   }, [id]);
 
@@ -22,7 +23,7 @@ export function ClaimsPanel({ id }: { id: string }) {
     <section>
       <h3>Claims vs. reality</h3>
       {!claims.hooksPresent && (
-        <p role="note">⚠ Hooks not installed for this session — edits shown are attempts; execution outcome is unknown.</p>
+        <p role="status">⚠ Hooks not installed for this session — edits shown are attempts; execution outcome is unknown.</p>
       )}
       {claims.files.length === 0 ? (
         <p>No file edits were attempted in this session.</p>
