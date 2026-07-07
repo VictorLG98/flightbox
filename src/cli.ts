@@ -3,6 +3,7 @@ import { collect } from './collector.js';
 import { cmdList } from './commands/list.js';
 import { cmdShow } from './commands/show.js';
 import { cmdStats } from './commands/stats.js';
+import { cmdDashboard } from './commands/dashboard.js';
 import { cmdInstall } from './commands/install.js';
 import { cmdUi } from './commands/ui.js';
 import { dbPath, traceboxHome } from './paths.js';
@@ -18,6 +19,7 @@ Usage:
   tracebox list        recent sessions
   tracebox show <id>   session timeline
   tracebox stats       token usage aggregates
+  tracebox dashboard   fleet-wide metrics summary
   tracebox ui          open the local web UI (Ctrl-C to stop)
   tracebox collect     (internal) hook entry point, reads stdin
 `;
@@ -58,6 +60,9 @@ export async function main(argv: string[]): Promise<number> {
     }
     case 'stats':
       await withStore((s) => cmdStats(s));
+      return 0;
+    case 'dashboard':
+      await withStore((s) => cmdDashboard(s));
       return 0;
     case 'ui':
       return await cmdUi();

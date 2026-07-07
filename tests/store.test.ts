@@ -91,3 +91,77 @@ describe('store', () => {
     expect(store.fileTouchCount('s1')).toBe(2);
   });
 });
+
+describe('store — metrics aggregates', () => {
+  beforeEach(() => {
+    store.upsertSession({ id: 's1', projectDir: '/p/app', startedAt: '2026-07-05T09:00:00.000Z' });
+    store.upsertSession({ id: 's2', projectDir: '/p/app', startedAt: '2026-07-05T14:00:00.000Z' });
+    store.upsertSession({ id: 's3', projectDir: '/p/other', startedAt: '2026-07-06T10:00:00.000Z' });
+    store.insertTokenUsage({ sessionId: 's1', messageUuid: 'm1', model: 'x', ts: '2026-07-05T09:01:00.000Z', inputTokens: 100, outputTokens: 20, cacheReadTokens: 5, cacheCreationTokens: 1 });
+    store.insertTokenUsage({ sessionId: 's3', messageUuid: 'm2', model: 'x', ts: '2026-07-06T10:01:00.000Z', inputTokens: 300, outputTokens: 40, cacheReadTokens: 0, cacheCreationTokens: 0 });
+    store.insertEvent(evt({ sessionId: 's1', uniqKey: 'k1', toolName: 'Read' }));
+    store.insertEvent(evt({ sessionId: 's1', uniqKey: 'k2', toolName: 'Read' }));
+    store.insertEvent(evt({ sessionId: 's2', uniqKey: 'k3', toolName: 'Bash' }));
+    store.insertFileTouch({ sessionId: 's1', path: '/p/app/a.ts', action: 'edit', ts: '2026-07-05T09:02:00.000Z', uniqKey: 'ft1' });
+    store.insertFileTouch({ sessionId: 's2', path: '/p/app/a.ts', action: 'edit', ts: '2026-07-05T14:02:00.000Z', uniqKey: 'ft2' });
+  });
+
+  it('activityByDay merges sessions and tokens per day, ascending', () => {
+    expect(store.activityByDay()).toEqual([
+      { day: '2026-07-05', sessions: 2, tokens: 120 },
+      { day: '2026-07-06', sessions: 1, tokens: 340 },
+    ]);
+  });
+
+  it('activityByProject counts distinct sessions and sums tokens', () => {
+    expect(store.activityByProject()).toEqual([
+      { project: '/p/other', sessions: 1, tokens: 340 },
+      { project: '/p/app', sessions: 2, tokens: 120 },
+    ]);
+  });
+
+  it('topTools ranks by frequency, respecting the limit', () => {
+    expect(store.topTools(10)).toEqual([
+      { tool: 'Read', count: 2 },
+      { tool: 'Bash', count: 1 },
+    ]);
+    expect(store.topTools(1)).toEqual([{ tool: 'Read', count: 2 }]);
+  });
+
+  it('totalTokens sums every usage column', () => {
+    expect(store.totalTokens()).toEqual({ input: 400, output: 60, cacheRead: 5, cacheCreation: 1 });
+  });
+
+  it('totalFileTouches counts distinct (session, path) pairs', () => {
+    // s1 and s2 both edited a.ts -> two distinct pairs
+    expect(store.totalFileTouches()).toBe(2);
+  });
+
+  it('projectNames lists distinct projects (coalescing unknown)', () => {
+    expect(store.projectNames()).toEqual(['/p/app', '/p/other']);
+  });
+
+  it('filters aggregates by project', () => {
+    const f = { project: '/p/app' };
+    expect(store.filteredSessions(f).map((s) => s.id).sort()).toEqual(['s1', 's2']);
+    expect(store.totalTokens(f)).toMatchObject({ input: 100, output: 20 });
+    expect(store.activityByDay(f)).toEqual([{ day: '2026-07-05', sessions: 2, tokens: 120 }]);
+    expect(store.topTools(10, f)).toEqual([
+      { tool: 'Read', count: 2 },
+      { tool: 'Bash', count: 1 },
+    ]);
+  });
+
+  it('activityByHour buckets events by UTC weekday and hour', () => {
+    // s1 events seeded at 2026-07-05 (Sunday, weekday 0) 14:0x UTC
+    const rows = store.activityByHour();
+    expect(rows).toContainEqual({ weekday: 0, hour: 14, count: 3 });
+  });
+
+  it('filters aggregates by day range', () => {
+    const f = { from: '2026-07-06', to: '2026-07-06' };
+    expect(store.filteredSessions(f).map((s) => s.id)).toEqual(['s3']);
+    expect(store.totalTokens(f)).toMatchObject({ input: 300, output: 40 });
+    expect(store.activityByDay(f)).toEqual([{ day: '2026-07-06', sessions: 1, tokens: 340 }]);
+  });
+});

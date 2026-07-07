@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import http, { type Server, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { Store } from '../store.js';
 import { webDistDir } from '../paths.js';
-import { sessionListDto, sessionDetailDto, claimsDto } from './store-api.js';
+import { sessionListDto, sessionDetailDto, claimsDto, metricsDto } from './store-api.js';
 import { resolveStaticFile } from './static.js';
 
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -35,6 +35,15 @@ export function createServer(store: Store, distDir: string = webDistDir()): Serv
     const url = new URL(req.url ?? '/', 'http://127.0.0.1');
     const parts = url.pathname.split('/').filter(Boolean); // e.g. ['api','sessions','abc','claims']
 
+    if (parts[0] === 'api' && parts[1] === 'metrics' && parts.length === 2) {
+      const day = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+      sendJson(res, 200, metricsDto(store, {
+        project: url.searchParams.get('project') || null,
+        from: day(url.searchParams.get('from')),
+        to: day(url.searchParams.get('to')),
+      }));
+      return;
+    }
     if (parts[0] === 'api' && parts[1] === 'sessions') {
       if (parts.length === 2) {
         sendJson(res, 200, sessionListDto(store));

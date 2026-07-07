@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openStore, type Store } from '../src/store.js';
-import { sessionListDto, sessionDetailDto, claimsDto } from '../src/server/store-api.js';
+import { sessionListDto, sessionDetailDto, claimsDto, metricsDto, streakOf, estimateCostUsd } from '../src/server/store-api.js';
 
 let tmp: string;
 let store: Store;
@@ -72,5 +72,67 @@ describe('claimsDto', () => {
   });
   it('returns null for unknown session', () => {
     expect(claimsDto(store, 'nope')).toBeNull();
+  });
+});
+
+describe('streakOf', () => {
+  it('is zero for no active days', () => {
+    expect(streakOf([])).toEqual({ current: 0, longest: 0 });
+  });
+  it('finds the longest run and the run ending on the most recent day', () => {
+    // two runs: [01,02,03] (len 3) and [10,11] (len 2, most recent)
+    const days = ['2026-07-11', '2026-07-01', '2026-07-02', '2026-07-10', '2026-07-03'];
+    expect(streakOf(days)).toEqual({ current: 2, longest: 3 });
+  });
+  it('deduplicates repeated days', () => {
+    expect(streakOf(['2026-07-01', '2026-07-01', '2026-07-02'])).toEqual({ current: 2, longest: 2 });
+  });
+});
+
+describe('estimateCostUsd', () => {
+  it('prices input/output plus cache read (0.1x) and write (1.25x) by model family', () => {
+    // Opus: $5/1M input, $25/1M output. 1M input + 1M output = 5 + 25 = 30.
+    expect(estimateCostUsd('claude-opus-4-8', { input: 1_000_000, output: 1_000_000, cacheRead: 0, cacheCreation: 0 })).toBeCloseTo(30);
+    // Sonnet cache read: 1M * ($3 * 0.1) = 0.30
+    expect(estimateCostUsd('claude-sonnet-4-6', { input: 0, output: 0, cacheRead: 1_000_000, cacheCreation: 0 })).toBeCloseTo(0.3);
+    // Unknown model → no estimate
+    expect(estimateCostUsd('gpt-4', { input: 1_000_000, output: 0, cacheRead: 0, cacheCreation: 0 })).toBe(0);
+  });
+});
+
+describe('metricsDto', () => {
+  it('aggregates totals, reliability, calendar, projects, tools and streak', () => {
+    // beforeEach seeds one hooked session ('hooked') on 2026-07-05 with a discrepancy.
+    store.upsertSession({ id: 'plain', projectDir: '/p/other', startedAt: '2026-07-06T10:00:00.000Z', endedAt: '2026-07-06T10:20:00.000Z' });
+    store.insertTokenUsage({ sessionId: 'plain', messageUuid: 'pm1', model: 'x', ts: '2026-07-06T10:01:00.000Z', inputTokens: 500, outputTokens: 100, cacheReadTokens: 0, cacheCreationTokens: 0 });
+
+    const m = metricsDto(store);
+    expect(m.totals.sessions).toBe(2);
+    expect(m.totals.tokens).toEqual({ input: 1500, output: 300, cacheRead: 50, cacheCreation: 10 });
+    expect(m.totals.files).toBe(2);
+    expect(m.totals.avgDurationMs).toBe(900000); // (10min + 20min) / 2 = 15min
+
+    // only 'hooked' has hook events, and it has a discrepancy
+    expect(m.reliability).toEqual({ sessionsWithHooks: 1, sessionsWithDiscrepancy: 1, discrepancyRate: 1 });
+
+    expect(m.calendar).toEqual([
+      { day: '2026-07-05', sessions: 1, tokens: 1200 },
+      { day: '2026-07-06', sessions: 1, tokens: 600 },
+    ]);
+    expect(m.streak).toEqual({ current: 2, longest: 2 });
+    expect(m.byProject).toContainEqual({ project: '/p/app', sessions: 1, tokens: 1200 });
+    expect(m.topTools).toContainEqual({ tool: 'Bash', count: 1 });
+
+    // cost: only the sonnet tokens are priced; 'plain' uses model 'x' (unknown -> $0)
+    expect(m.cost.byModel).toContainEqual({ model: 'claude-sonnet-4-6', usd: expect.any(Number) });
+    expect(m.cost.totalUsd).toBeGreaterThan(0);
+    // event-type breakdown from hook events
+    expect(m.eventTypes).toContainEqual({ type: 'command', count: 1 });
+    expect(m.eventTypes).toContainEqual({ type: 'subagent_spawn', count: 1 });
+    // files & folders touched
+    expect(m.topFiles).toContainEqual({ path: '/p/app/a.ts', touches: 1 });
+    expect(m.topFolders).toContainEqual({ folder: '/p/app', touches: 2 });
+    // hourly heatmap: hooked's two events land Sunday (weekday 0) at 14:00 UTC
+    expect(m.hourly).toContainEqual({ weekday: 0, hour: 14, count: 2 });
   });
 });

@@ -17,6 +17,15 @@ export interface ClaimRow {
   status: 'succeeded' | 'failed' | 'attempted';
 }
 
+/** Optional dashboard filters. `project` is a COALESCE(project_dir,'(unknown)')
+ *  value; `from`/`to` are inclusive 'YYYY-MM-DD' day bounds. A null/omitted field
+ *  means "no constraint". */
+export interface MetricsFilter {
+  project?: string | null;
+  from?: string | null;
+  to?: string | null;
+}
+
 export interface Store {
   upsertSession(p: SessionPatch): void;
   insertEvent(e: AtfEvent): void;
@@ -33,8 +42,26 @@ export interface Store {
   };
   statsByDay(): Array<{ day: string; tokens: number }>;
   statsByProject(): Array<{ project: string; tokens: number }>;
+  filteredSessions(filter?: MetricsFilter): SessionSummary[];
+  activityByDay(filter?: MetricsFilter): Array<{ day: string; sessions: number; tokens: number }>;
+  activityByProject(filter?: MetricsFilter): Array<{ project: string; sessions: number; tokens: number }>;
+  topTools(limit: number, filter?: MetricsFilter): Array<{ tool: string; count: number }>;
+  totalTokens(filter?: MetricsFilter): { input: number; output: number; cacheRead: number; cacheCreation: number };
+  totalFileTouches(filter?: MetricsFilter): number;
+  tokensByModel(filter?: MetricsFilter): Array<{
+    model: string; input: number; output: number; cacheRead: number; cacheCreation: number;
+  }>;
+  eventTypeBreakdown(filter?: MetricsFilter): Array<{ type: string; count: number }>;
+  fileTouchStats(filter?: MetricsFilter): Array<{ path: string; touches: number }>;
+  activityByHour(filter?: MetricsFilter): Array<{ weekday: number; hour: number; count: number }>;
+  projectNames(): string[];
   claimsForSession(sessionId: string): ClaimRow[];
   close(): void;
+}
+
+/** Named-parameter bind object for the '@param IS NULL OR …' filter guards. */
+function bindFilter(f: MetricsFilter = {}): { project: string | null; from: string | null; to: string | null } {
+  return { project: f.project ?? null, from: f.from ?? null, to: f.to ?? null };
 }
 
 const SCHEMA = `
@@ -158,6 +185,93 @@ export function openStore(file: string = dbPath()): Store {
     FROM token_usage t LEFT JOIN sessions s ON s.id = t.session_id
     GROUP BY project ORDER BY tokens DESC
   `);
+  // Reusable filter guards. `@param IS NULL` disables a constraint, so one static
+  // prepared statement serves both the filtered and unfiltered dashboard.
+  const PROJ = `(@project IS NULL OR COALESCE(s.project_dir, '(unknown)') = @project)`;
+  const dayBounds = (col: string) =>
+    `(@from IS NULL OR substr(${col}, 1, 10) >= @from) AND (@to IS NULL OR substr(${col}, 1, 10) <= @to)`;
+
+  const filteredSessionsSql = db.prepare(`
+    ${LIST_SQL}
+    WHERE ${PROJ} AND ${dayBounds('s.started_at')}
+    ORDER BY s.started_at DESC
+  `);
+  // Sessions are dated by their start; tokens by each usage record's ts. A UNION
+  // of both into a common (day, sessions, tokens) shape lets one GROUP BY combine
+  // days that have sessions, tokens, or both.
+  const activityByDaySql = db.prepare(`
+    SELECT day, SUM(sessions) AS sessions, SUM(tokens) AS tokens FROM (
+      SELECT substr(s.started_at, 1, 10) AS day, 1 AS sessions, 0 AS tokens
+        FROM sessions s WHERE s.started_at IS NOT NULL AND ${PROJ} AND ${dayBounds('s.started_at')}
+      UNION ALL
+      SELECT substr(t.ts, 1, 10) AS day, 0 AS sessions, (t.input_tokens + t.output_tokens) AS tokens
+        FROM token_usage t JOIN sessions s ON s.id = t.session_id
+        WHERE ${PROJ} AND ${dayBounds('t.ts')}
+    ) GROUP BY day ORDER BY day
+  `);
+  const activityByProjectSql = db.prepare(`
+    SELECT COALESCE(s.project_dir, '(unknown)') AS project,
+           COUNT(DISTINCT s.id) AS sessions,
+           COALESCE(SUM(t.input_tokens + t.output_tokens), 0) AS tokens
+    FROM sessions s LEFT JOIN token_usage t ON t.session_id = s.id
+    WHERE ${PROJ} AND ${dayBounds('s.started_at')}
+    GROUP BY project ORDER BY tokens DESC, sessions DESC
+  `);
+  const topToolsSql = db.prepare(`
+    SELECT e.tool_name AS tool, COUNT(*) AS count
+    FROM events e JOIN sessions s ON s.id = e.session_id
+    WHERE e.tool_name IS NOT NULL AND e.tool_name != '' AND ${PROJ} AND ${dayBounds('e.ts')}
+    GROUP BY e.tool_name ORDER BY count DESC, tool ASC LIMIT @limit
+  `);
+  const totalTokensSql = db.prepare(`
+    SELECT COALESCE(SUM(t.input_tokens),0) AS input, COALESCE(SUM(t.output_tokens),0) AS output,
+           COALESCE(SUM(t.cache_read_tokens),0) AS cacheRead, COALESCE(SUM(t.cache_creation_tokens),0) AS cacheCreation
+    FROM token_usage t JOIN sessions s ON s.id = t.session_id
+    WHERE ${PROJ} AND ${dayBounds('t.ts')}
+  `);
+  const totalFileTouchesSql = db.prepare(`
+    SELECT COUNT(*) AS n FROM (
+      SELECT DISTINCT ft.session_id, ft.path
+      FROM file_touches ft JOIN sessions s ON s.id = ft.session_id
+      WHERE ${PROJ} AND ${dayBounds('ft.ts')}
+    )
+  `);
+  const tokensByModelSql = db.prepare(`
+    SELECT COALESCE(t.model, '(unknown)') AS model,
+           COALESCE(SUM(t.input_tokens),0) AS input, COALESCE(SUM(t.output_tokens),0) AS output,
+           COALESCE(SUM(t.cache_read_tokens),0) AS cacheRead, COALESCE(SUM(t.cache_creation_tokens),0) AS cacheCreation
+    FROM token_usage t JOIN sessions s ON s.id = t.session_id
+    WHERE ${PROJ} AND ${dayBounds('t.ts')}
+    GROUP BY COALESCE(t.model, '(unknown)') ORDER BY (input + output) DESC
+  `);
+  const eventTypeBreakdownSql = db.prepare(`
+    SELECT e.type AS type, COUNT(*) AS count
+    FROM events e JOIN sessions s ON s.id = e.session_id
+    WHERE ${PROJ} AND ${dayBounds('e.ts')}
+    GROUP BY e.type ORDER BY count DESC, type ASC
+  `);
+  // Aggregated per path (at most one row per distinct file); the DTO layer derives
+  // both top-files and top-folders from this in JS.
+  const fileTouchStatsSql = db.prepare(`
+    SELECT ft.path AS path, COUNT(*) AS touches
+    FROM file_touches ft JOIN sessions s ON s.id = ft.session_id
+    WHERE ${PROJ} AND ${dayBounds('ft.ts')}
+    GROUP BY ft.path ORDER BY touches DESC, path ASC
+  `);
+  // Event activity bucketed by UTC weekday (0=Sun) × hour (0-23) for a "when do
+  // I work" heatmap. Rows are sparse; the UI fills the 7×24 grid.
+  const activityByHourSql = db.prepare(`
+    SELECT CAST(strftime('%w', e.ts) AS INTEGER) AS weekday,
+           CAST(strftime('%H', e.ts) AS INTEGER) AS hour,
+           COUNT(*) AS count
+    FROM events e JOIN sessions s ON s.id = e.session_id
+    WHERE e.ts IS NOT NULL AND ${PROJ} AND ${dayBounds('e.ts')}
+    GROUP BY weekday, hour
+  `);
+  const projectNamesSql = db.prepare(`
+    SELECT COALESCE(project_dir, '(unknown)') AS project FROM sessions
+    GROUP BY project ORDER BY project
+  `);
 
   const rowToEvent = (r: any): AtfEvent => ({
     sessionId: r.session_id,
@@ -200,6 +314,31 @@ export function openStore(file: string = dbPath()): Store {
       statsByDaySql.all() as Array<{ day: string; tokens: number }>,
     statsByProject: () =>
       statsByProjectSql.all() as Array<{ project: string; tokens: number }>,
+    filteredSessions: (filter) =>
+      filteredSessionsSql.all(bindFilter(filter)) as SessionSummary[],
+    activityByDay: (filter) =>
+      activityByDaySql.all(bindFilter(filter)) as Array<{ day: string; sessions: number; tokens: number }>,
+    activityByProject: (filter) =>
+      activityByProjectSql.all(bindFilter(filter)) as Array<{ project: string; sessions: number; tokens: number }>,
+    topTools: (limit, filter) =>
+      topToolsSql.all({ ...bindFilter(filter), limit }) as Array<{ tool: string; count: number }>,
+    totalTokens: (filter) => {
+      const r = totalTokensSql.get(bindFilter(filter)) as any;
+      return { input: r.input, output: r.output, cacheRead: r.cacheRead, cacheCreation: r.cacheCreation };
+    },
+    totalFileTouches: (filter) => (totalFileTouchesSql.get(bindFilter(filter)) as any).n,
+    tokensByModel: (filter) =>
+      tokensByModelSql.all(bindFilter(filter)) as Array<{
+        model: string; input: number; output: number; cacheRead: number; cacheCreation: number;
+      }>,
+    eventTypeBreakdown: (filter) =>
+      eventTypeBreakdownSql.all(bindFilter(filter)) as Array<{ type: string; count: number }>,
+    fileTouchStats: (filter) =>
+      fileTouchStatsSql.all(bindFilter(filter)) as Array<{ path: string; touches: number }>,
+    activityByHour: (filter) =>
+      activityByHourSql.all(bindFilter(filter)) as Array<{ weekday: number; hour: number; count: number }>,
+    projectNames: () =>
+      (projectNamesSql.all() as Array<{ project: string }>).map((r) => r.project),
     insertToolOutcome: (o) =>
       insOutcome.run({ ...o, success: o.success === null ? null : o.success ? 1 : 0 }),
     claimsForSession: (sessionId) =>

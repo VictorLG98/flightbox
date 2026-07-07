@@ -46,14 +46,21 @@ npm install && npm run build && npm link
 | `tracebox list` | Recent sessions: project, started, events, tokens |
 | `tracebox show <id>` | Timeline of one session |
 | `tracebox stats` | Token usage by day and by project |
+| `tracebox dashboard` | Fleet-wide metrics summary in the terminal |
 | `tracebox ui` | Open the local web UI (Ctrl-C to stop) |
 
 ## Web UI
 
 `tracebox ui` ingests the latest data, starts a local server on `127.0.0.1`
 (no auth, no network — it binds loopback only), and opens your browser. It
-serves a small single-page app with two views:
+serves a small single-page app with three views:
 
+- **Dashboard** (home) — fleet-wide metrics (sessions, tokens, files, average
+  duration, discrepancy rate, active-day streak), a GitHub-style activity
+  calendar (one cell per day, shaded by session count or token volume, hover for
+  the daily breakdown, click a day to jump into that day's sessions), plus
+  token-by-project and top-tool breakdowns. Filter everything by project and time
+  range.
 - **Session list** — project, date, duration, tokens, files touched, and a
   badge on sessions with a claims-vs-reality discrepancy.
 - **Session view** — three zones: a summary header, a filterable/searchable

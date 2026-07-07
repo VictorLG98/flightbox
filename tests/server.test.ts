@@ -51,6 +51,27 @@ describe('http server', () => {
     expect(body.files).toEqual([{ path: '/p/app/a.ts', status: 'attempted' }]);
   });
 
+  it('GET /api/metrics returns the aggregate dashboard payload', async () => {
+    const res = await fetch(`${base}/api/metrics`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('application/json');
+    const body = await res.json();
+    expect(body.totals.sessions).toBe(1);
+    expect(body.calendar).toContainEqual({ day: '2026-07-05', sessions: 1, tokens: 0 });
+    expect(Array.isArray(body.byProject)).toBe(true);
+    expect(body.streak).toEqual({ current: 1, longest: 1 });
+    expect(body.projects).toContain('/p/app');
+  });
+
+  it('GET /api/metrics honours project and day filters', async () => {
+    const other = await (await fetch(`${base}/api/metrics?project=${encodeURIComponent('/p/other')}`)).json();
+    expect(other.totals.sessions).toBe(0);
+    const inRange = await (await fetch(`${base}/api/metrics?from=2026-07-05&to=2026-07-05`)).json();
+    expect(inRange.totals.sessions).toBe(1);
+    const outOfRange = await (await fetch(`${base}/api/metrics?from=2026-07-06`)).json();
+    expect(outOfRange.totals.sessions).toBe(0);
+  });
+
   it('unknown session detail is 404 JSON', async () => {
     const res = await fetch(`${base}/api/sessions/nope`);
     expect(res.status).toBe(404);
